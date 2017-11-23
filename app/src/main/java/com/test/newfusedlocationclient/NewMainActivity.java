@@ -1,9 +1,10 @@
 package com.test.newfusedlocationclient;
 
 
-
 import android.Manifest;
+import android.app.Activity;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.Uri;
@@ -12,39 +13,55 @@ import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
+import com.google.android.gms.location.LocationSettingsStates;
+import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import java.util.Locale;
 
 /**
- * Location sample.
- * Facing issue in this class.
- * Scenario : Disable Location Services (GPS/Location) and then run app on mobile data will throw error.
- * To Solve this issue Check {@link NewMainActivity} class.
- * We have used latest SettingsClient
+ * Latest SettingsClient api is used to check Location Services for Phone enabled or not
  * https://developers.google.com/android/reference/com/google/android/gms/location/SettingsClient
- * to resolve the issue.
+ */
+
+/**
+ * Location sample.
  * <p>
  * Demonstrates use of the Location API to retrieve the last known location for a device.
  */
-public class MainActivity extends AppCompatActivity {
+public class NewMainActivity extends AppCompatActivity {
 
-    private static final String TAG = MainActivity.class.getSimpleName();
+    private static final String TAG = NewMainActivity.class.getSimpleName();
 
     private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 34;
+
+    /**
+     * Constant used in the location settings dialog.
+     */
+    protected static final int REQUEST_CHECK_SETTINGS = 0x1;
 
     /**
      * Provides the entry point to the Fused Location Provider API.
      */
     private FusedLocationProviderClient mFusedLocationClient;
+    private LocationRequest mLocationRequest;
+
+    private long UPDATE_INTERVAL = 10 * 1000;  /* 10 secs */
+    private long FASTEST_INTERVAL = 2000; /* 2 sec */
 
     /**
      * Represents a geographical location.
@@ -55,7 +72,7 @@ public class MainActivity extends AppCompatActivity {
     private String mLongitudeLabel;
     private TextView mLatitudeText;
     private TextView mLongitudeText;
-
+    Task<LocationSettingsResponse> result;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -67,18 +84,87 @@ public class MainActivity extends AppCompatActivity {
         mLatitudeText = (TextView) findViewById((R.id.latitude_text));
         mLongitudeText = (TextView) findViewById((R.id.longitude_text));
 
+
+        initLocationParameters();
+   }
+
+    /**
+     * Initialize basic parameters which are required
+     */
+
+    private void initLocationParameters() {
+        // Create the location request to start receiving updates
+        mLocationRequest = new LocationRequest();
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        mLocationRequest.setInterval(UPDATE_INTERVAL);
+        mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
+
+
+        // Create LocationSettingsRequest object using location request
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder();
+        builder.addLocationRequest(mLocationRequest);
+        LocationSettingsRequest locationSettingsRequest = builder.build();
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-    }
 
-    @Override
-    public void onStart() {
-        super.onStart();
+        result = LocationServices.getSettingsClient(this).checkLocationSettings(locationSettingsRequest);
+        result.addOnCompleteListener(new OnCompleteListener<LocationSettingsResponse>() {
+            @Override
+            public void onComplete(@NonNull Task<LocationSettingsResponse> task) {
+                try {
+                    LocationSettingsResponse response = task.getResult(ApiException.class);
 
-        if (!checkPermissions()) {
-            requestPermissions();
-        } else {
-            getLastLocation();
-        }
+                    /**
+                     * Check if Settings->Location is enabled/disabled
+                     * Not app specific permission (location)
+                     * Here I am talking of the scenario where Settings->Location is disabled and user runs the app.
+                     */
+                    // All location settings are satisfied. The client can initialize location
+                    if (!checkPermissions()) {
+                        requestPermissions();
+                    } else {
+                        getLastLocation(); //from create
+                    }
+
+                    // requests here.
+                } catch (ApiException exception) {
+
+                    /**
+                     * Go in exception because Settings->Location is disabled.
+                     * First it will Enable Location Services (GPS) then check for run time permission to app.
+                     */
+                    switch (exception.getStatusCode()) {
+                        case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                            // Location settings are not satisfied. But could be fixed by showing the
+                            // user a dialog.
+                            try {
+                                // Cast to a resolvable exception.
+                                ResolvableApiException resolvable = (ResolvableApiException) exception;
+                                // Show the dialog by calling startResolutionForResult(),
+
+                                /**
+                                 * Display enable Enable Location Services (GPS) dialog like Google Map and then
+                                 * check for run time permission to app.
+                                 */
+                                // and check the result in onActivityResult().
+                                resolvable.startResolutionForResult(
+                                        NewMainActivity.this,
+                                        REQUEST_CHECK_SETTINGS);
+                            } catch (IntentSender.SendIntentException e) {
+                                // Ignore the error.
+                            } catch (ClassCastException e) {
+                                // Ignore, should be an impossible error.
+                            }
+                            break;
+                        case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                            // Location settings are not satisfied. However, we have no way to fix the
+                            // settings so we won't show the dialog.
+                            break;
+                    }
+                }
+            }
+        });
+
+
     }
 
     /**
@@ -91,22 +177,28 @@ public class MainActivity extends AppCompatActivity {
      */
     @SuppressWarnings("MissingPermission")
     private void getLastLocation() {
+
         mFusedLocationClient.getLastLocation()
                 .addOnCompleteListener(this, new OnCompleteListener<Location>() {
                     @Override
                     public void onComplete(@NonNull Task<Location> task) {
-                        if (task.isSuccessful() && task.getResult() != null) {
-                            mLastLocation = task.getResult();
+                        try {
+                            if (task.isSuccessful() && task.getResult() != null) {
+                                mLastLocation = task.getResult();
 
-                            mLatitudeText.setText(String.format(Locale.ENGLISH, "%s: %f",
-                                    mLatitudeLabel,
-                                    mLastLocation.getLatitude()));
-                            mLongitudeText.setText(String.format(Locale.ENGLISH, "%s: %f",
-                                    mLongitudeLabel,
-                                    mLastLocation.getLongitude()));
-                        } else {
-                            Log.w(TAG, "getLastLocation:exception", task.getException());
-                            showSnackbar(getString(R.string.no_location_detected));
+                                mLatitudeText.setText(String.format(Locale.ENGLISH, "%s: %f",
+                                        mLatitudeLabel,
+                                        mLastLocation.getLatitude()));
+                                mLongitudeText.setText(String.format(Locale.ENGLISH, "%s: %f",
+                                        mLongitudeLabel,
+                                        mLastLocation.getLongitude()));
+                            } else {
+                                Log.w(TAG, "getLastLocation:exception", task.getException());
+                                showSnackbar(getString(R.string.no_location_detected));
+                                getLastLocation(); //to fectch location if got error in first try
+                            }
+                        } catch (Exception exception) {
+                            Log.e(TAG, "exc:getLastLocation" + exception.getLocalizedMessage());
                         }
                     }
                 });
@@ -143,13 +235,13 @@ public class MainActivity extends AppCompatActivity {
      * Return the current state of the permissions needed.
      */
     private boolean checkPermissions() {
-        int permissionState = ActivityCompat.checkSelfPermission(this,
+        int permissionState = ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_COARSE_LOCATION);
         return permissionState == PackageManager.PERMISSION_GRANTED;
     }
 
     private void startLocationPermissionRequest() {
-        ActivityCompat.requestPermissions(MainActivity.this,
+        ActivityCompat.requestPermissions(NewMainActivity.this,
                 new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
                 REQUEST_PERMISSIONS_REQUEST_CODE);
     }
@@ -183,6 +275,39 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
+     * Here resukt of Enable Location Services (GPS) dialog is returned and after that
+     * RESULT_OK app will ask for run time permission.
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        final LocationSettingsStates states = LocationSettingsStates.fromIntent(data);
+        switch (requestCode) {
+            case REQUEST_CHECK_SETTINGS:
+                switch (resultCode) {
+                    case Activity.RESULT_OK:
+                        // All required changes were successfully made
+                        if (!checkPermissions()) {
+                            requestPermissions();
+                        } else {
+                            getLastLocation(); //from onActivityResult
+                        }
+                        break;
+                    case Activity.RESULT_CANCELED:
+                        // The user was asked to change settings, but chose not to
+                        showSnackbar(getString(R.string.settings_location_required));
+                        break;
+                    default:
+                        break;
+                }
+                break;
+        }
+    }
+
+    /**
      * Callback received when a permissions request has been completed.
      */
     @Override
@@ -196,7 +321,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.i(TAG, "User interaction was cancelled.");
             } else if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Permission granted.
-                getLastLocation();
+                getLastLocation(); //on permission result
             } else {
                 // Permission denied.
 
