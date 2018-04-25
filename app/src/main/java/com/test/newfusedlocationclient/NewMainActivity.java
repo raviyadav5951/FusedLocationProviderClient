@@ -175,33 +175,41 @@ public class NewMainActivity extends AppCompatActivity {
      * <p>
      * Note: this method should be called after location permission has been granted.
      */
-    @SuppressWarnings("MissingPermission")
+
     private void getLastLocation() {
 
-        mFusedLocationClient.getLastLocation()
-                .addOnCompleteListener(this, new OnCompleteListener<Location>() {
-                    @Override
-                    public void onComplete(@NonNull Task<Location> task) {
-                        try {
-                            if (task.isSuccessful() && task.getResult() != null) {
-                                mLastLocation = task.getResult();
+        try {
 
-                                mLatitudeText.setText(String.format(Locale.ENGLISH, "%s: %f",
-                                        mLatitudeLabel,
-                                        mLastLocation.getLatitude()));
-                                mLongitudeText.setText(String.format(Locale.ENGLISH, "%s: %f",
-                                        mLongitudeLabel,
-                                        mLastLocation.getLongitude()));
-                            } else {
-                                Log.w(TAG, "getLastLocation:exception", task.getException());
-                                showSnackbar(getString(R.string.no_location_detected));
-                                getLastLocation(); //to fectch location if got error in first try
+            mFusedLocationClient.getLastLocation()
+                    .addOnCompleteListener(this, new OnCompleteListener<Location>() {
+                        @Override
+                        public void onComplete(@NonNull Task<Location> task) {
+                            try {
+                                if (task.isSuccessful() && task.getResult() != null) {
+                                    mLastLocation = task.getResult();
+
+                                    mLatitudeText.setText(String.format(Locale.ENGLISH, "%s: %f",
+                                            mLatitudeLabel,
+                                            mLastLocation.getLatitude()));
+                                    mLongitudeText.setText(String.format(Locale.ENGLISH, "%s: %f",
+                                            mLongitudeLabel,
+                                            mLastLocation.getLongitude()));
+                                } else {
+                                    Log.w(TAG, "getLastLocation:exception", task.getException());
+                                    showSnackbar(getString(R.string.no_location_detected));
+                                }
+                            } catch (Exception exception) {
+                                Log.e(TAG, "exc:getLastLocation" + exception.getLocalizedMessage());
                             }
-                        } catch (Exception exception) {
-                            Log.e(TAG, "exc:getLastLocation" + exception.getLocalizedMessage());
                         }
-                    }
-                });
+                    });
+        } catch (SecurityException e) {
+            e.printStackTrace();
+            Log.w(TAG, "getLastLocation: Security exception:"+e.getLocalizedMessage());
+
+        }
+
+
     }
 
     /**
