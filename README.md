@@ -6,7 +6,8 @@
 <meta-data android:name="com.google.android.geo.API_KEY"       
             android:value="GoogleMap Key"/>
 ```
-## To Register a new app on Google Console
+
+## For Google Map Support only,to register a new app on Google Console
 You can create a new app on https://console.cloud.google.com and have to go to  **Enabled APIs and services**  to enable **Geolocation API** 
 
 **Note : Don't forget to paste your Android applicationId from app->build.gradle and your SHA while creating key.
