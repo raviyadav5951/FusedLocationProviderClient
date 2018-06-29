@@ -6,9 +6,16 @@
 <meta-data android:name="com.google.android.geo.API_KEY"       
             android:value="GoogleMap Key"/>
 ```
+## To Register a new app on Google Console
+You can create a new app on https://console.cloud.google.com and have to go to  **Enabled APIs and services**  to enable **Geolocation API** and 
+
+**Note : Don't forget to paste your Android applicationId from app->build.gradle and your SHA while creating key.
+
+-Create the key and paste into Android app.
+
 
 ## build.gradle(App module)
 ```
-compile 'com.google.android.gms:play-services-location:11.4.2'
-compile 'com.google.android.gms:play-services-maps:11.4.2'
+implementation 'com.google.android.gms:play-services-location:15.0.1'
+implementation 'com.google.android.gms:play-services-maps:15.0.1'
 ```
