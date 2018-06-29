@@ -1,7 +1,7 @@
 ## Using FusedLocationProviderClient
 - Find your current location using FusedLocationProviderClient
 - [Add in Google LBS API  version 11](https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient)
-## Be sure to read(AndroidMenifest.xml)
+## Be sure to read(AndroidManifest.xml)
 ```
 <meta-data android:name="com.google.android.geo.API_KEY"       
             android:value="GoogleMap Key"/>
